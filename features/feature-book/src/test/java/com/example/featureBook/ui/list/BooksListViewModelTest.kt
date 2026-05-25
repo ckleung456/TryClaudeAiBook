@@ -8,6 +8,8 @@ import com.example.featureBook.model.domain.BookUiModel
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
 import com.example.featureBook.module.local.BooksCacheRepository
+import com.example.featureBook.ui.UiState
+import com.example.featureBook.ui.UiText
 import com.example.featureBook.usecase.LoadBooksUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,25 +45,24 @@ class BooksListViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // Helper: skips the initial loading value from WhileSubscribed's StateFlow replay
-    private suspend fun app.cash.turbine.TurbineTestContext<BooksListUiState>.skipLoadingIfPresent(): BooksListUiState {
+    private suspend fun app.cash.turbine.TurbineTestContext<UiState<BooksListState>>.skipLoadingIfPresent(): UiState<BooksListState> {
         val first = awaitItem()
-        return if (first.isLoading) awaitItem() else first
+        return if (first is UiState.Loading) awaitItem() else first
     }
 
     @Test
     fun `initial state has loading true`() {
-        assertTrue(viewModel.uiState.value.isLoading)
+        assertTrue(viewModel.state.value is UiState.Loading)
     }
 
     @Test
     fun `state transitions to success with books after use case emits`() = runTest {
         fakeUseCase.books = listOf(makeUiBook("1", "Alpha"), makeUiBook("2", "Beta"))
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             val state = skipLoadingIfPresent()
-            assertFalse(state.isLoading)
-            assertEquals(2, state.books.size)
+            assertTrue(state is UiState.Success)
+            assertEquals(2, (state as UiState.Success).data.books.size)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -70,10 +71,10 @@ class BooksListViewModelTest {
     fun `state shows error when use case emits failure`() = runTest {
         fakeUseCase.error = RuntimeException("Load failed")
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             val state = skipLoadingIfPresent()
-            assertFalse(state.isLoading)
-            assertEquals("Load failed", state.error)
+            assertTrue(state is UiState.Error)
+            assertEquals("Load failed", ((state as UiState.Error).message as UiText.DynamicString).value)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -82,11 +83,11 @@ class BooksListViewModelTest {
     fun `toggleViewMode switches from LIST to GRID`() = runTest {
         fakeUseCase.books = emptyList()
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             skipLoadingIfPresent()
-            viewModel.toggleViewMode()
+            viewModel.onAction(BooksListAction.OnToggleViewMode)
             val updated = awaitItem()
-            assertEquals(ViewMode.GRID, updated.viewMode)
+            assertEquals(ViewMode.GRID, (updated as UiState.Success).data.viewMode)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -95,13 +96,13 @@ class BooksListViewModelTest {
     fun `toggleViewMode switches from GRID back to LIST`() = runTest {
         fakeUseCase.books = emptyList()
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             skipLoadingIfPresent()
-            viewModel.toggleViewMode()
+            viewModel.onAction(BooksListAction.OnToggleViewMode)
             awaitItem() // GRID
-            viewModel.toggleViewMode()
+            viewModel.onAction(BooksListAction.OnToggleViewMode)
             val updated = awaitItem()
-            assertEquals(ViewMode.LIST, updated.viewMode)
+            assertEquals(ViewMode.LIST, (updated as UiState.Success).data.viewMode)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -110,11 +111,11 @@ class BooksListViewModelTest {
     fun `toggleSortOrder cycles ASCENDING to DESCENDING`() = runTest {
         fakeUseCase.books = emptyList()
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             skipLoadingIfPresent() // initial ASCENDING
-            viewModel.toggleSortOrder()
+            viewModel.onAction(BooksListAction.OnToggleSortOrder)
             val descState = skipLoadingIfPresent()
-            assertEquals(SortOrder.DESCENDING, descState.sortOrder)
+            assertEquals(SortOrder.DESCENDING, (descState as UiState.Success).data.sortOrder)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -126,12 +127,13 @@ class BooksListViewModelTest {
             makeUiBook("2", "Java Basics")
         )
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             skipLoadingIfPresent()
-            viewModel.updateSearchQuery("Kotlin")
+            viewModel.onAction(BooksListAction.OnUpdateSearchQuery("Kotlin"))
             val filtered = awaitItem()
-            assertEquals(1, filtered.displayedBooks.size)
-            assertEquals("Kotlin Guide", filtered.displayedBooks.first().title)
+            val data = (filtered as UiState.Success).data
+            assertEquals(1, data.displayedBooks.size)
+            assertEquals("Kotlin Guide", data.displayedBooks.first().title)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -143,12 +145,13 @@ class BooksListViewModelTest {
             makeUiBook("2", "Book B", author = "Jane Doe")
         )
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             skipLoadingIfPresent()
-            viewModel.updateSearchQuery("Martin")
+            viewModel.onAction(BooksListAction.OnUpdateSearchQuery("Martin"))
             val filtered = awaitItem()
-            assertEquals(1, filtered.displayedBooks.size)
-            assertEquals("Martin Fowler", filtered.displayedBooks.first().author)
+            val data = (filtered as UiState.Success).data
+            assertEquals(1, data.displayedBooks.size)
+            assertEquals("Martin Fowler", data.displayedBooks.first().author)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -157,14 +160,15 @@ class BooksListViewModelTest {
     fun `setSearchActive false clears query and shows all books`() = runTest {
         fakeUseCase.books = listOf(makeUiBook("1", "Kotlin"), makeUiBook("2", "Java"))
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             skipLoadingIfPresent()
-            viewModel.updateSearchQuery("Kotlin")
+            viewModel.onAction(BooksListAction.OnUpdateSearchQuery("Kotlin"))
             awaitItem() // filtered to 1
-            viewModel.setSearchActive(false)
+            viewModel.onAction(BooksListAction.OnSetSearchActive(false))
             val restored = awaitItem()
-            assertEquals(2, restored.displayedBooks.size)
-            assertFalse(restored.isSearchActive)
+            val data = (restored as UiState.Success).data
+            assertEquals(2, data.displayedBooks.size)
+            assertFalse(data.isSearchActive)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -173,7 +177,7 @@ class BooksListViewModelTest {
     fun `saveScrollPosition persists index in SavedStateHandle`() {
         val handle = SavedStateHandle()
         val vm = BooksListViewModel(fakeUseCase, handle)
-        vm.saveScrollPosition(7)
+        vm.onAction(BooksListAction.OnSaveScrollPosition(7))
         assertEquals(7, handle.get<Int>("scroll_index"))
     }
 
@@ -182,9 +186,9 @@ class BooksListViewModelTest {
         val handle = SavedStateHandle(mapOf("scroll_index" to 5))
         val vm = BooksListViewModel(fakeUseCase, handle)
 
-        vm.uiState.test {
+        vm.state.test {
             val state = skipLoadingIfPresent()
-            assertEquals(5, state.savedScrollIndex)
+            assertEquals(5, (state as UiState.Success).data.savedScrollIndex)
             cancelAndIgnoreRemainingEvents()
         }
     }

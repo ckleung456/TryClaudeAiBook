@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -36,33 +38,44 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.example.featureBook.model.domain.BookUiModel
+import com.example.featureBook.ui.ObserveAsEvents
+import com.example.featureBook.ui.UIStatefulContent
+import com.example.featureBook.ui.UiState
+import com.example.featureBook.ui.asString
 
 @Composable
-fun BookDetailRoute(
+fun BookDetailRoot(
     onBack: () -> Unit,
     viewModel: BookDetailViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    BackHandler(onBack = onBack)
+    val state by viewModel.state.collectAsState()
+
+    ObserveAsEvents(viewModel.events) { event ->
+        when (event) {
+            BookDetailEvent.NavigateBack -> onBack()
+        }
+    }
+
     BookDetailScreen(
-        uiState = uiState,
-        onBack = onBack,
-        onRetry = viewModel::loadBookDetail
+        state = state,
+        onAction = viewModel::onAction
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookDetailScreen(
-    uiState: BookDetailUiState,
-    onBack: () -> Unit,
-    onRetry: () -> Unit
+    state: UiState<BookDetailState>,
+    onAction: (BookDetailAction) -> Unit
 ) {
-    val title = if (uiState is BookDetailUiState.Success) uiState.book.title else "Book Detail"
+    val title = (state as? UiState.Success)?.data?.book?.title ?: "Book Detail"
+
+    BackHandler { onAction(BookDetailAction.OnBackClick) }
 
     Scaffold(
         topBar = {
@@ -71,11 +84,11 @@ fun BookDetailScreen(
                     Text(
                         text = title,
                         maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { onAction(BookDetailAction.OnBackClick) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Navigate back"
@@ -94,25 +107,30 @@ fun BookDetailScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (uiState) {
-                is BookDetailUiState.Loading -> CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                is BookDetailUiState.Error -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp)
-                ) {
-                    Text(text = uiState.message, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    androidx.compose.material3.TextButton(onClick = onRetry) {
-                        Text("Retry")
+            UIStatefulContent(
+                state = state,
+                loadingContent = {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                },
+                errorContent = { uiText ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(24.dp)
+                    ) {
+                        Text(text = uiText.asString(), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(onClick = { onAction(BookDetailAction.OnRetry) }) {
+                            Text("Retry")
+                        }
                     }
+                },
+                successContent = { bookDetailState ->
+                    BookDetailContent(book = bookDetailState.book)
                 }
-                is BookDetailUiState.Success -> BookDetailContent(book = uiState.book)
-            }
+            )
         }
     }
 }
@@ -207,24 +225,19 @@ private fun BookDetailContent(book: BookUiModel) {
 
 @Composable
 private fun DetailRow(label: String, value: String) {
-    androidx.compose.foundation.layout.Row(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Row(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "$label: ",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun RatingRow(rating: Double) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {

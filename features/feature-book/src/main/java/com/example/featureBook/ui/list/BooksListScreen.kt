@@ -23,12 +23,12 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,43 +61,46 @@ import coil3.compose.AsyncImage
 import com.example.featureBook.model.domain.BookUiModel
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
+import com.example.featureBook.ui.ObserveAsEvents
+import com.example.featureBook.ui.UIStatefulContent
+import com.example.featureBook.ui.UiState
+import com.example.featureBook.ui.asString
 
 @Composable
-fun BooksListRoute(
-    onBookClick: (String) -> Unit,
+fun BooksListRoot(
+    onNavigateToDetail: (String) -> Unit,
     viewModel: BooksListViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val state by viewModel.state.collectAsState()
+
+    ObserveAsEvents(viewModel.events) { event ->
+        when (event) {
+            is BooksListEvent.NavigateToDetail -> onNavigateToDetail(event.bookId)
+        }
+    }
+
     BooksListScreen(
-        uiState = uiState,
-        onBookClick = onBookClick,
-        onToggleViewMode = viewModel::toggleViewMode,
-        onToggleSortOrder = viewModel::toggleSortOrder,
-        onSearchQueryChange = viewModel::updateSearchQuery,
-        onSearchActiveChange = viewModel::setSearchActive,
-        onScrollPositionChange = viewModel::saveScrollPosition
+        state = state,
+        onAction = viewModel::onAction
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BooksListScreen(
-    uiState: BooksListUiState,
-    onBookClick: (String) -> Unit,
-    onToggleViewMode: () -> Unit,
-    onToggleSortOrder: () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchActiveChange: (Boolean) -> Unit,
-    onScrollPositionChange: (Int) -> Unit
+    state: UiState<BooksListState>,
+    onAction: (BooksListAction) -> Unit
 ) {
+    val data = (state as? UiState.Success)?.data
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    if (uiState.isSearchActive) {
+                    if (data?.isSearchActive == true) {
                         TextField(
-                            value = uiState.searchQuery,
-                            onValueChange = onSearchQueryChange,
+                            value = data.searchQuery,
+                            onValueChange = { onAction(BooksListAction.OnUpdateSearchQuery(it)) },
                             placeholder = { Text("Search by title or author") },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
@@ -113,24 +116,24 @@ fun BooksListScreen(
                     }
                 },
                 actions = {
-                    if (uiState.isSearchActive) {
-                        IconButton(onClick = { onSearchActiveChange(false) }) {
+                    if (data?.isSearchActive == true) {
+                        IconButton(onClick = { onAction(BooksListAction.OnSetSearchActive(false)) }) {
                             Icon(Icons.Default.Close, contentDescription = "Close search")
                         }
                     } else {
-                        IconButton(onClick = { onSearchActiveChange(true) }) {
+                        IconButton(onClick = { onAction(BooksListAction.OnSetSearchActive(true)) }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = onToggleSortOrder) {
+                        IconButton(onClick = { onAction(BooksListAction.OnToggleSortOrder) }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Sort,
-                                contentDescription = if (uiState.sortOrder == SortOrder.ASCENDING) "Sort Z→A" else "Sort A→Z"
+                                contentDescription = if (data?.sortOrder == SortOrder.ASCENDING) "Sort Z→A" else "Sort A→Z"
                             )
                         }
-                        IconButton(onClick = onToggleViewMode) {
+                        IconButton(onClick = { onAction(BooksListAction.OnToggleViewMode) }) {
                             Icon(
-                                imageVector = if (uiState.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList,
-                                contentDescription = if (uiState.viewMode == ViewMode.LIST) "Switch to grid" else "Switch to list"
+                                imageVector = if (data?.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList,
+                                contentDescription = if (data?.viewMode == ViewMode.LIST) "Switch to grid" else "Switch to list"
                             )
                         }
                     }
@@ -147,25 +150,35 @@ fun BooksListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when {
-                uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                uiState.error != null -> ErrorContent(
-                    message = uiState.error,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                uiState.viewMode == ViewMode.LIST -> BooksListContent(
-                    books = uiState.displayedBooks,
-                    initialScrollIndex = uiState.savedScrollIndex,
-                    onBookClick = onBookClick,
-                    onScrollPositionChange = onScrollPositionChange
-                )
-                else -> BooksGridContent(
-                    books = uiState.displayedBooks,
-                    initialScrollIndex = uiState.savedScrollIndex,
-                    onBookClick = onBookClick,
-                    onScrollPositionChange = onScrollPositionChange
-                )
-            }
+            UIStatefulContent(
+                state = state,
+                loadingContent = {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                },
+                errorContent = { uiText ->
+                    ErrorContent(
+                        message = uiText.asString(),
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                },
+                successContent = { booksListState ->
+                    if (booksListState.viewMode == ViewMode.LIST) {
+                        BooksListContent(
+                            books = booksListState.displayedBooks,
+                            initialScrollIndex = booksListState.savedScrollIndex,
+                            onBookClick = { onAction(BooksListAction.OnBookClick(it)) },
+                            onScrollPositionChange = { onAction(BooksListAction.OnSaveScrollPosition(it)) }
+                        )
+                    } else {
+                        BooksGridContent(
+                            books = booksListState.displayedBooks,
+                            initialScrollIndex = booksListState.savedScrollIndex,
+                            onBookClick = { onAction(BooksListAction.OnBookClick(it)) },
+                            onScrollPositionChange = { onAction(BooksListAction.OnSaveScrollPosition(it)) }
+                        )
+                    }
+                }
+            )
         }
     }
 }
@@ -278,7 +291,6 @@ private fun BookGridItem(book: BookUiModel, onClick: () -> Unit) {
                 error = fallbackPainter,
                 modifier = Modifier.fillMaxSize()
             )
-            // Gradient overlay at the bottom for text readability
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

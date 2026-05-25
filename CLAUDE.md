@@ -57,32 +57,60 @@ di/
 
 navigation/
   BooksNavRoutes.kt        — @Serializable route objects (BooksListRoute, BookDetailRoute)
-  BooksNavGraph.kt         — NavGraphBuilder extension wiring both screens
+  BooksNavGraph.kt         — wires BooksListRoot / BookDetailRoot to nav routes
 
 ui/
-  list/   BooksListUiState.kt, BooksListViewModel.kt, BooksListScreen.kt
-  detail/ BookDetailUiState.kt, BookDetailViewModel.kt, BookDetailScreen.kt
+  UiState.kt           — sealed interface UiState<T> (Loading / Success<T> / Error(UiText))
+  UiText.kt            — sealed interface UiText + asString() extension
+  UIStatefulContent.kt — @Composable that switches on UiState<T>
+  ObserveAsEvents.kt   — LaunchedEffect helper for one-time event collection
+
+  list/
+    BooksListState.kt    — screen data inside UiState.Success
+    BooksListAction.kt   — sealed interface of all user actions
+    BooksListEvent.kt    — one-time side effect: NavigateToDetail
+    BooksListViewModel.kt
+    BooksListScreen.kt   — BooksListRoot (injects VM) + BooksListScreen (stateless)
+
+  detail/
+    BookDetailState.kt   — screen data inside UiState.Success
+    BookDetailAction.kt  — OnRetry, OnBackClick
+    BookDetailEvent.kt   — NavigateBack
+    BookDetailViewModel.kt
+    BookDetailScreen.kt  — BookDetailRoot (injects VM) + BookDetailScreen (stateless)
 ```
+
+### MVVM pattern (Action / Event / UiState)
+
+Every screen follows this contract:
+
+- **`UiState<ScreenState>`** — ViewModel exposes `state: StateFlow<UiState<T>>`. Composables call `UIStatefulContent` to branch on Loading / Error / Success.
+- **`Action`** — the only public mutation API on a ViewModel is `onAction(Action)`. No individual setter functions.
+- **`Event`** — one-time side effects (navigation, etc.) flow through a `Channel<Event>` exposed as `events: Flow<Event>`. Root composables observe via `ObserveAsEvents(viewModel.events) { ... }`.
+- **Composable split**: `*Root` composable injects `hiltViewModel()` and observes events; `*Screen` composable is stateless, receives `state` + `onAction`. Both live in the same file.
+- **Navigation**: back navigation also routes through the event channel — `OnBackClick` action → `NavigateBack` event → root calls `navController.popBackStack()`. `BackHandler` in the screen composable calls `onAction(OnBackClick)`.
 
 ### Key patterns
 
 **Offline-first flow** (`LoadBooksUseCase`): sequential `flow { }` that (1) emits the current Room cache immediately, then (2) fetches from remote, saves to cache, and emits the refreshed cache. Do not change this to `channelFlow + launch` — it causes non-deterministic ordering in tests with `StandardTestDispatcher`.
 
-**ViewModel state**: `BooksListViewModel` uses `flatMapLatest` on `_sortOrder` to re-invoke the use case whenever sort order changes, then `combine`s with view-mode, search query, and search-active flows into a single `StateFlow<BooksListUiState>` via `stateIn(WhileSubscribed(5000))`. `BookDetailViewModel` reads `bookId` directly from `SavedStateHandle["bookId"]` — do not use `toRoute<>()` (requires Navigation backstack context unavailable in unit tests).
+**`BooksListViewModel` state pipeline**: `_sortOrder.flatMapLatest { loadBooksUseCase(it) }` combined with `_viewMode`, `_searchQuery`, `_isSearchActive` flows via `combine`, producing `UiState<BooksListState>` via `stateIn(WhileSubscribed(5000))`. Sort order change re-triggers the use case; the cache emits immediately so there is no Loading flash between sort changes.
+
+**`BookDetailViewModel`**: reads `bookId` directly from `SavedStateHandle["bookId"]` — do not use `toRoute<>()` (requires Navigation backstack context, unavailable in unit tests).
 
 **Genres serialization**: `Book.genres: List<String>` → stored in Room as a comma-joined `String` in `BookEntity.genres` → split back on read in `BookMapper`. No TypeConverter is registered.
 
 **Image loading**: Coil 3.x (`coil3:coil-compose`, `coil3:coil-network-okhttp`). Use `AsyncImage` with `rememberVectorPainter(Icons.AutoMirrored.Filled.MenuBook)` as placeholder/error painter.
 
-**Navigation**: Type-safe Navigation 2.8 with `@Serializable` route data classes. `BookDetailRoute(bookId)` encodes `bookId` into the backstack; `BookDetailViewModel` reads it via `SavedStateHandle`.
+**Navigation naming**: `BooksListRoute` / `BookDetailRoute` in `BooksNavRoutes.kt` are the `@Serializable` route objects used as type parameters in `composable<T>`. The root composables are named `BooksListRoot` / `BookDetailRoot` — these are different things and must stay distinct.
 
 ### Testing approach
 
 Fakes over mocks — no Mockk usage in existing tests despite it being on the classpath:
 - `FakeBookDao` — `MutableStateFlow`-backed; has `seed(List<BookEntity>)` to pre-populate
-- `FakeBooksRemoteRepository` — extends `BooksRemoteRepository()`; expose `var books` and `var shouldThrow`
+- `FakeBooksRemoteRepository` — extends `BooksRemoteRepository()`; exposes `var books` and `var shouldThrow`
 - `FakeLoadBooksUseCase` / `FakeGetBookDetailUseCase` — extend the real use case classes and override `operator fun invoke`
 
-All ViewModel tests set `Dispatchers.setMain(UnconfinedTestDispatcher())` in `@Before` and reset in `@After`. Use Turbine's `Flow.test { }` for asserting emissions.
+All ViewModel tests set `Dispatchers.setMain(UnconfinedTestDispatcher())` in `@Before` and reset in `@After`. Use Turbine's `Flow.test { }` for asserting emissions. Access state via `viewModel.state` (not `uiState`).
 
-**StateFlow conflation gotcha**: if a fake `suspend fun` has no real suspension points, `Loading → Success` can happen in one tick and the intermediate `Loading` emission is dropped by StateFlow conflation. Add `yield()` inside the fake to give collectors a chance to observe transient states.
+**StateFlow conflation gotcha**: if a fake `suspend fun` has no real suspension points, `Loading → Success` can happen in one tick and the intermediate `Loading` emission is dropped by StateFlow conflation. Add `yield()` inside the fake to give collectors a chance to observe transient states (see `FakeGetBookDetailUseCase`).

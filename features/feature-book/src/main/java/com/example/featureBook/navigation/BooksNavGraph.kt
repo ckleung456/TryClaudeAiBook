@@ -3,17 +3,17 @@ package com.example.featureBook.navigation
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import com.example.featureBook.ui.detail.BookDetailRoute
-import com.example.featureBook.ui.list.BooksListRoute
+import com.example.featureBook.ui.detail.BookDetailRoot
+import com.example.featureBook.ui.list.BooksListRoot
 
 fun NavGraphBuilder.booksGraph(navController: NavController) {
     composable<BooksListRoute> {
-        BooksListRoute(
-            onBookClick = { bookId -> navController.navigate(BookDetailRoute(bookId)) }
+        BooksListRoot(
+            onNavigateToDetail = { bookId -> navController.navigate(BookDetailRoute(bookId)) }
         )
     }
     composable<BookDetailRoute> {
-        BookDetailRoute(
+        BookDetailRoot(
             onBack = { navController.popBackStack() }
         )
     }

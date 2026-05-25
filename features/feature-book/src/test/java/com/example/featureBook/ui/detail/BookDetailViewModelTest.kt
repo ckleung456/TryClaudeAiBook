@@ -6,6 +6,7 @@ import com.example.featureBook.fake.FakeBookDao
 import com.example.featureBook.fake.FakeBooksRemoteRepository
 import com.example.featureBook.model.domain.BookUiModel
 import com.example.featureBook.module.local.BooksCacheRepository
+import com.example.featureBook.ui.UiState
 import com.example.featureBook.usecase.GetBookDetailUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,10 +46,10 @@ class BookDetailViewModelTest {
         )
         val viewModel = buildViewModel("book_1", fakeUseCase)
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             val state = awaitItem()
-            assertTrue(state is BookDetailUiState.Success)
-            assertEquals("Test Book", (state as BookDetailUiState.Success).book.title)
+            assertTrue(state is UiState.Success)
+            assertEquals("Test Book", (state as UiState.Success<BookDetailState>).data.book.title)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -60,32 +61,29 @@ class BookDetailViewModelTest {
         )
         val viewModel = buildViewModel("book_1", fakeUseCase)
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             val state = awaitItem()
-            assertTrue(state is BookDetailUiState.Error)
-            assertTrue((state as BookDetailUiState.Error).message.isNotEmpty())
+            assertTrue(state is UiState.Error)
+            assertTrue((state as UiState.Error).message.asString().isNotEmpty())
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `retry via loadBookDetail emits Loading then resolves to Success`() = runTest {
+    fun `retry via OnRetry action emits Loading then resolves to Success`() = runTest {
         val fakeUseCase = FakeGetBookDetailUseCase(
             Result.success(makeUiBook("book_1", "Test Book"))
         )
         val viewModel = buildViewModel("book_1", fakeUseCase)
 
-        viewModel.uiState.test {
+        viewModel.state.test {
             awaitItem() // Success from init
-            viewModel.loadBookDetail()
-            // StateFlow emits Loading (different from previous Success)
+            viewModel.onAction(BookDetailAction.OnRetry)
             val loading = awaitItem()
-            assertTrue(loading is BookDetailUiState.Loading)
-            // StateFlow won't re-emit the same Success value, so check value directly
+            assertTrue(loading is UiState.Loading)
             cancelAndIgnoreRemainingEvents()
         }
-        // Verify final state is Success after retry
-        assertTrue(viewModel.uiState.value is BookDetailUiState.Success)
+        assertTrue(viewModel.state.value is UiState.Success)
     }
 
     private fun makeUiBook(id: String, title: String) = BookUiModel(
@@ -93,6 +91,9 @@ class BookDetailViewModelTest {
         publishedYear = 2020, rating = 4.0, description = "", genres = emptyList()
     )
 }
+
+private fun com.example.featureBook.ui.UiText.asString(): String =
+    (this as com.example.featureBook.ui.UiText.DynamicString).value
 
 class FakeGetBookDetailUseCase(
     private val result: Result<BookUiModel>
