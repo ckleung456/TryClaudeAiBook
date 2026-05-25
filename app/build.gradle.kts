@@ -58,7 +58,10 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.hilt.android)
-    implementation(libs.hilt.compiler)
+    kapt(libs.hilt.compiler)
+    implementation(libs.navigation.compose)
+    implementation(libs.hilt.navigation.compose)
+    implementation(project(":features:feature-book"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

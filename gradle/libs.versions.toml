@@ -20,6 +20,23 @@ json = "1.6.3"
 retrofit = "3.0.0"
 okhttp3 = "4.10.0"
 
+# Room
+room = "2.7.1"
+
+# Navigation
+navigationCompose = "2.8.5"
+hiltNavigationCompose = "1.2.0"
+
+# Coil
+coil = "3.1.0"
+
+# Coroutines
+kotlinxCoroutines = "1.9.0"
+
+# Testing
+mockk = "1.13.12"
+turbine = "1.2.0"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -45,6 +62,33 @@ retrofit-converter = { group = "com.squareup.retrofit2", name = "converter-gson"
 okhttp3-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
 kotlinx-serialization-json = { module  = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "json" }
+
+# Room
+room-runtime  = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-ktx      = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+
+# Navigation
+navigation-compose      = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+
+# Coil
+coil-compose        = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+
+# Lifecycle ViewModel Compose
+lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
+
+# Material Icons Extended
+material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+# Coroutines
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test    = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+
+# Testing
+mockk   = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
