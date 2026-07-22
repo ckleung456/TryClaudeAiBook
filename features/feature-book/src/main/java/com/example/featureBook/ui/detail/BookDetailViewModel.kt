@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.featureBook.ui.UiState
 import com.example.featureBook.ui.UiText
 import com.example.featureBook.usecase.GetBookDetailUseCase
+import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -45,11 +47,16 @@ class BookDetailViewModel @Inject constructor(
 
     private fun loadBookDetail() {
         viewModelScope.launch {
-            _state.value = UiState.Loading
-            getBookDetailUseCase(bookId).fold(
-                onSuccess = { _state.value = UiState.Success(BookDetailState(it)) },
-                onFailure = { _state.value = UiState.Error(UiText.DynamicString(it.message ?: "Unknown error")) }
-            )
+            getBookDetailUseCase.invoke(bookId).collect { output ->
+                when (output) {
+                    is UseCaseOutputWithStatus.Progress ->
+                        _state.update { UiState.Loading }
+                    is UseCaseOutputWithStatus.Success ->
+                        _state.update { UiState.Success(BookDetailState(output.result)) }
+                    is UseCaseOutputWithStatus.Failed ->
+                        _state.update { UiState.Error(UiText.DynamicString(output.error.message ?: "Unknown error")) }
+                }
+            }
         }
     }
 }

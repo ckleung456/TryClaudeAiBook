@@ -4,13 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.example.featureBook.fake.FakeBookDao
 import com.example.featureBook.fake.FakeBooksRemoteRepository
-import com.example.featureBook.model.domain.BookUiModel
+import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.module.local.BooksCacheRepository
 import com.example.featureBook.ui.UiState
 import com.example.featureBook.usecase.GetBookDetailUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -25,10 +24,14 @@ import org.junit.Test
 class BookDetailViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
+    private lateinit var fakeRemote: FakeBooksRemoteRepository
+    private lateinit var fakeDao: FakeBookDao
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        fakeRemote = FakeBooksRemoteRepository()
+        fakeDao = FakeBookDao()
     }
 
     @After
@@ -36,15 +39,16 @@ class BookDetailViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun buildViewModel(bookId: String, useCase: GetBookDetailUseCase): BookDetailViewModel =
-        BookDetailViewModel(useCase, SavedStateHandle(mapOf("bookId" to bookId)))
+    private fun buildViewModel(bookId: String): BookDetailViewModel =
+        BookDetailViewModel(
+            GetBookDetailUseCase(fakeRemote, BooksCacheRepository(fakeDao)),
+            SavedStateHandle(mapOf("bookId" to bookId))
+        )
 
     @Test
     fun `state transitions from Loading to Success when book is found`() = runTest {
-        val fakeUseCase = FakeGetBookDetailUseCase(
-            Result.success(makeUiBook("book_1", "Test Book"))
-        )
-        val viewModel = buildViewModel("book_1", fakeUseCase)
+        fakeDao.seed(listOf(makeEntity("book_1", "Test Book")))
+        val viewModel = buildViewModel("book_1")
 
         viewModel.state.test {
             val state = awaitItem()
@@ -56,10 +60,8 @@ class BookDetailViewModelTest {
 
     @Test
     fun `state transitions to Error when use case returns failure`() = runTest {
-        val fakeUseCase = FakeGetBookDetailUseCase(
-            Result.failure(Exception("Book not found"))
-        )
-        val viewModel = buildViewModel("book_1", fakeUseCase)
+        fakeRemote.shouldThrow = true
+        val viewModel = buildViewModel("book_1")
 
         viewModel.state.test {
             val state = awaitItem()
@@ -71,10 +73,8 @@ class BookDetailViewModelTest {
 
     @Test
     fun `retry via OnRetry action emits Loading then resolves to Success`() = runTest {
-        val fakeUseCase = FakeGetBookDetailUseCase(
-            Result.success(makeUiBook("book_1", "Test Book"))
-        )
-        val viewModel = buildViewModel("book_1", fakeUseCase)
+        fakeDao.seed(listOf(makeEntity("book_1", "Test Book")))
+        val viewModel = buildViewModel("book_1")
 
         viewModel.state.test {
             awaitItem() // Success from init
@@ -86,23 +86,11 @@ class BookDetailViewModelTest {
         assertTrue(viewModel.state.value is UiState.Success)
     }
 
-    private fun makeUiBook(id: String, title: String) = BookUiModel(
+    private fun makeEntity(id: String, title: String) = BookEntity(
         id = id, title = title, author = "Author", coverUrl = "",
-        publishedYear = 2020, rating = 4.0, description = "", genres = emptyList()
+        publishedYear = 2020, rating = 4.0, description = "", genres = "", createdAt = 0L
     )
 }
 
 private fun com.example.featureBook.ui.UiText.asString(): String =
     (this as com.example.featureBook.ui.UiText.DynamicString).value
-
-class FakeGetBookDetailUseCase(
-    private val result: Result<BookUiModel>
-) : GetBookDetailUseCase(
-    FakeBooksRemoteRepository(),
-    BooksCacheRepository(FakeBookDao())
-) {
-    override suspend fun invoke(bookId: String): Result<BookUiModel> {
-        yield()
-        return result
-    }
-}

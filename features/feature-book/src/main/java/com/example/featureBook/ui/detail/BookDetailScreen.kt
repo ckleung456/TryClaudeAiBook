@@ -112,7 +112,7 @@ fun BookDetailScreen(
                 loadingContent = {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 },
-                errorContent = { uiText ->
+                errorContent = { uiText, _ ->
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,

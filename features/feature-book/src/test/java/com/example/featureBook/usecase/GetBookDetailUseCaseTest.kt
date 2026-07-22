@@ -1,10 +1,12 @@
 package com.example.featureBook.usecase
 
+import app.cash.turbine.test
 import com.example.featureBook.fake.FakeBookDao
 import com.example.featureBook.fake.FakeBooksRemoteRepository
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.model.network.Book
 import com.example.featureBook.module.local.BooksCacheRepository
+import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -31,20 +33,25 @@ class GetBookDetailUseCaseTest {
         fakeDao.seed(listOf(makeEntity("book_1", "Cached Title")))
         fakeRemote.books = emptyList()
 
-        val result = useCase("book_1")
-
-        assertTrue(result.isSuccess)
-        assertEquals("Cached Title", result.getOrNull()?.title)
+        useCase.invoke("book_1").test {
+            awaitItem() // Progress
+            val success = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals("Cached Title", success.result.title)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
     fun `fetches from remote when not in cache and saves to cache`() = runTest {
         fakeRemote.books = listOf(makeBook("book_2", "Remote Title"))
 
-        val result = useCase("book_2")
+        useCase.invoke("book_2").test {
+            awaitItem() // Progress
+            val success = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals("Remote Title", success.result.title)
+            cancelAndIgnoreRemainingEvents()
+        }
 
-        assertTrue(result.isSuccess)
-        assertEquals("Remote Title", result.getOrNull()?.title)
         assertTrue(fakeDao.getBookById("book_2") != null)
     }
 
@@ -52,18 +59,22 @@ class GetBookDetailUseCaseTest {
     fun `returns error when book not found in cache or remote`() = runTest {
         fakeRemote.books = emptyList()
 
-        val result = useCase("nonexistent_id")
-
-        assertTrue(result.isFailure)
+        useCase.invoke("nonexistent_id").test {
+            awaitItem() // Progress
+            assertTrue(awaitItem() is UseCaseOutputWithStatus.Failed)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
     fun `returns error when remote throws`() = runTest {
         fakeRemote.shouldThrow = true
 
-        val result = useCase("book_1")
-
-        assertTrue(result.isFailure)
+        useCase.invoke("book_1").test {
+            awaitItem() // Progress
+            assertTrue(awaitItem() is UseCaseOutputWithStatus.Failed)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -71,9 +82,12 @@ class GetBookDetailUseCaseTest {
         fakeDao.seed(listOf(makeEntity("book_1", "Cached Title")))
         fakeRemote.books = listOf(makeBook("book_1", "Remote Title"))
 
-        val result = useCase("book_1")
-
-        assertEquals("Cached Title", result.getOrNull()?.title)
+        useCase.invoke("book_1").test {
+            awaitItem() // Progress
+            val success = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals("Cached Title", success.result.title)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     private fun makeBook(id: String, title: String) = Book(

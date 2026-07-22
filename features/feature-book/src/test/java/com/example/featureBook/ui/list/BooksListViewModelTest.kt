@@ -4,17 +4,15 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.example.featureBook.fake.FakeBookDao
 import com.example.featureBook.fake.FakeBooksRemoteRepository
-import com.example.featureBook.model.domain.BookUiModel
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
+import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.module.local.BooksCacheRepository
 import com.example.featureBook.ui.UiState
 import com.example.featureBook.ui.UiText
 import com.example.featureBook.usecase.LoadBooksUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -30,14 +28,18 @@ import org.junit.Test
 class BooksListViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
-    private lateinit var fakeUseCase: FakeLoadBooksUseCase
+    private lateinit var fakeRemote: FakeBooksRemoteRepository
+    private lateinit var fakeDao: FakeBookDao
+    private lateinit var loadBooksUseCase: LoadBooksUseCase
     private lateinit var viewModel: BooksListViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        fakeUseCase = FakeLoadBooksUseCase()
-        viewModel = BooksListViewModel(fakeUseCase, SavedStateHandle())
+        fakeRemote = FakeBooksRemoteRepository()
+        fakeDao = FakeBookDao()
+        loadBooksUseCase = LoadBooksUseCase(fakeRemote, BooksCacheRepository(fakeDao))
+        viewModel = BooksListViewModel(loadBooksUseCase, SavedStateHandle())
     }
 
     @After
@@ -57,7 +59,7 @@ class BooksListViewModelTest {
 
     @Test
     fun `state transitions to success with books after use case emits`() = runTest {
-        fakeUseCase.books = listOf(makeUiBook("1", "Alpha"), makeUiBook("2", "Beta"))
+        fakeDao.seed(listOf(makeEntity("1", "Alpha"), makeEntity("2", "Beta")))
 
         viewModel.state.test {
             val state = skipLoadingIfPresent()
@@ -69,20 +71,25 @@ class BooksListViewModelTest {
 
     @Test
     fun `state shows error when use case emits failure`() = runTest {
-        fakeUseCase.error = RuntimeException("Load failed")
+        fakeRemote.shouldThrow = true
 
         viewModel.state.test {
-            val state = skipLoadingIfPresent()
+            // Offline-first emits Loading, then the (empty) cached success, before the remote
+            // failure resolves to Error. With synchronous fakes and no real suspension between
+            // these stages, StateFlow conflation may deliver only a subset of them to the
+            // collector, so skip past whichever transient states do arrive.
+            var state = awaitItem()
+            while (state is UiState.Loading || (state is UiState.Success && state.data.books.isEmpty())) {
+                state = awaitItem()
+            }
             assertTrue(state is UiState.Error)
-            assertEquals("Load failed", ((state as UiState.Error).message as UiText.DynamicString).value)
+            assertEquals("Network error", ((state as UiState.Error).message as UiText.DynamicString).value)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
     fun `toggleViewMode switches from LIST to GRID`() = runTest {
-        fakeUseCase.books = emptyList()
-
         viewModel.state.test {
             skipLoadingIfPresent()
             viewModel.onAction(BooksListAction.OnToggleViewMode)
@@ -94,8 +101,6 @@ class BooksListViewModelTest {
 
     @Test
     fun `toggleViewMode switches from GRID back to LIST`() = runTest {
-        fakeUseCase.books = emptyList()
-
         viewModel.state.test {
             skipLoadingIfPresent()
             viewModel.onAction(BooksListAction.OnToggleViewMode)
@@ -109,8 +114,6 @@ class BooksListViewModelTest {
 
     @Test
     fun `toggleSortOrder cycles ASCENDING to DESCENDING`() = runTest {
-        fakeUseCase.books = emptyList()
-
         viewModel.state.test {
             skipLoadingIfPresent() // initial ASCENDING
             viewModel.onAction(BooksListAction.OnToggleSortOrder)
@@ -122,10 +125,7 @@ class BooksListViewModelTest {
 
     @Test
     fun `updateSearchQuery filters displayed books by title`() = runTest {
-        fakeUseCase.books = listOf(
-            makeUiBook("1", "Kotlin Guide"),
-            makeUiBook("2", "Java Basics")
-        )
+        fakeDao.seed(listOf(makeEntity("1", "Kotlin Guide"), makeEntity("2", "Java Basics")))
 
         viewModel.state.test {
             skipLoadingIfPresent()
@@ -140,9 +140,11 @@ class BooksListViewModelTest {
 
     @Test
     fun `updateSearchQuery filters displayed books by author`() = runTest {
-        fakeUseCase.books = listOf(
-            makeUiBook("1", "Book A", author = "Martin Fowler"),
-            makeUiBook("2", "Book B", author = "Jane Doe")
+        fakeDao.seed(
+            listOf(
+                makeEntity("1", "Book A", author = "Martin Fowler"),
+                makeEntity("2", "Book B", author = "Jane Doe")
+            )
         )
 
         viewModel.state.test {
@@ -158,7 +160,7 @@ class BooksListViewModelTest {
 
     @Test
     fun `setSearchActive false clears query and shows all books`() = runTest {
-        fakeUseCase.books = listOf(makeUiBook("1", "Kotlin"), makeUiBook("2", "Java"))
+        fakeDao.seed(listOf(makeEntity("1", "Kotlin"), makeEntity("2", "Java")))
 
         viewModel.state.test {
             skipLoadingIfPresent()
@@ -176,7 +178,7 @@ class BooksListViewModelTest {
     @Test
     fun `saveScrollPosition persists index in SavedStateHandle`() {
         val handle = SavedStateHandle()
-        val vm = BooksListViewModel(fakeUseCase, handle)
+        val vm = BooksListViewModel(loadBooksUseCase, handle)
         vm.onAction(BooksListAction.OnSaveScrollPosition(7))
         assertEquals(7, handle.get<Int>("scroll_index"))
     }
@@ -184,7 +186,7 @@ class BooksListViewModelTest {
     @Test
     fun `savedScrollIndex is restored from SavedStateHandle on creation`() = runTest {
         val handle = SavedStateHandle(mapOf("scroll_index" to 5))
-        val vm = BooksListViewModel(fakeUseCase, handle)
+        val vm = BooksListViewModel(loadBooksUseCase, handle)
 
         vm.state.test {
             val state = skipLoadingIfPresent()
@@ -193,20 +195,8 @@ class BooksListViewModelTest {
         }
     }
 
-    private fun makeUiBook(id: String, title: String, author: String = "Author") = BookUiModel(
+    private fun makeEntity(id: String, title: String, author: String = "Author") = BookEntity(
         id = id, title = title, author = author, coverUrl = "",
-        publishedYear = 2020, rating = 4.0, description = "", genres = emptyList()
+        publishedYear = 2020, rating = 4.0, description = "", genres = "", createdAt = 0L
     )
-}
-
-class FakeLoadBooksUseCase : LoadBooksUseCase(
-    FakeBooksRemoteRepository(),
-    BooksCacheRepository(FakeBookDao())
-) {
-    var books: List<BookUiModel> = emptyList()
-    var error: Throwable? = null
-
-    override operator fun invoke(sortOrder: SortOrder): Flow<Result<List<BookUiModel>>> =
-        error?.let { flowOf(Result.failure(it)) }
-            ?: flowOf(Result.success(books))
 }

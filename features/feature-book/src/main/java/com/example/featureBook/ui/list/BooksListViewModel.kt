@@ -8,6 +8,7 @@ import com.example.featureBook.model.domain.ViewMode
 import com.example.featureBook.ui.UiState
 import com.example.featureBook.ui.UiText
 import com.example.featureBook.usecase.LoadBooksUseCase
+import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -43,22 +44,23 @@ class BooksListViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val state: StateFlow<UiState<BooksListState>> = _sortOrder
         .flatMapLatest { sortOrder ->
-            loadBooksUseCase(sortOrder).map { result -> result to sortOrder }
+            loadBooksUseCase.invoke(sortOrder).map { output -> output to sortOrder }
         }
-        .combine(_viewMode) { (booksResult, sortOrder), viewMode ->
-            Triple(booksResult, sortOrder, viewMode)
+        .combine(_viewMode) { (output, sortOrder), viewMode ->
+            Triple(output, sortOrder, viewMode)
         }
-        .combine(_searchQuery) { (booksResult, sortOrder, viewMode), query ->
-            Pair(booksResult to sortOrder, viewMode to query)
+        .combine(_searchQuery) { (output, sortOrder, viewMode), query ->
+            Pair(output to sortOrder, viewMode to query)
         }
-        .combine(_isSearchActive) { (resultAndSort, viewAndQuery), isSearchActive ->
-            val (booksResult, sortOrder) = resultAndSort
+        .combine(_isSearchActive) { (outputAndSort, viewAndQuery), isSearchActive ->
+            val (output, sortOrder) = outputAndSort
             val (viewMode, query) = viewAndQuery
             val savedScrollIndex = savedStateHandle.get<Int>(KEY_SCROLL_INDEX) ?: 0
-            when {
-                booksResult.isSuccess -> UiState.Success(
+            when (output) {
+                is UseCaseOutputWithStatus.Progress -> UiState.Loading
+                is UseCaseOutputWithStatus.Success -> UiState.Success(
                     BooksListState(
-                        books = booksResult.getOrElse { emptyList() },
+                        books = output.result,
                         viewMode = viewMode,
                         sortOrder = sortOrder,
                         searchQuery = query,
@@ -66,8 +68,8 @@ class BooksListViewModel @Inject constructor(
                         savedScrollIndex = savedScrollIndex
                     )
                 )
-                else -> UiState.Error(
-                    UiText.DynamicString(booksResult.exceptionOrNull()?.message ?: "Unknown error")
+                is UseCaseOutputWithStatus.Failed -> UiState.Error(
+                    UiText.DynamicString(output.error.message ?: "Unknown error")
                 )
             }
         }

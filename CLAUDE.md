@@ -39,6 +39,7 @@ model/
   local/     BookEntity.kt        — Room entity (genres stored as comma-separated String)
   domain/    BookUiModel.kt       — UI model passed to composables
              SortOrder.kt         — ASCENDING / DESCENDING enum
+             ViewMode.kt          — GRID / LIST enum
              MockBookData.kt      — hardcoded JSON (no real network)
 
 module/
@@ -49,8 +50,9 @@ module/
   mapper/    BookMapper.kt             — Book↔BookEntity↔BookUiModel extension functions
 
 usecase/
-  LoadBooksUseCase.kt      — emits cached list first, then refreshed list after remote fetch
-  GetBookDetailUseCase.kt  — cache-first lookup; falls back to remote and saves result
+  base/FlowUseCase.kt      — shared UseCaseOutputWithStatus (Progress/Success/Failed) + FlowUseCase base class
+  LoadBooksUseCase.kt      — extends FlowUseCase; emits cached list first, then refreshed list after remote fetch
+  GetBookDetailUseCase.kt  — extends FlowUseCase; cache-first lookup, falls back to remote and saves result
 
 di/
   BooksDatabaseModule.kt   — provides BooksDatabase and BookDao (SingletonComponent)
@@ -60,8 +62,8 @@ navigation/
   BooksNavGraph.kt         — wires BooksListRoot / BookDetailRoot to nav routes
 
 ui/
-  UiState.kt           — sealed interface UiState<T> (Loading / Success<T> / Error(UiText))
-  UiText.kt            — sealed interface UiText + asString() extension
+  UiState.kt           — sealed interface UiState<T> (Loading / Success<T> / Error(UiText, errorData))
+  UiText.kt            — sealed interface UiText (DynamicString / StringResource) + @Composable asString()
   UIStatefulContent.kt — @Composable that switches on UiState<T>
   ObserveAsEvents.kt   — LaunchedEffect helper for one-time event collection
 
@@ -92,9 +94,13 @@ Every screen follows this contract:
 
 ### Key patterns
 
-**Offline-first flow** (`LoadBooksUseCase`): sequential `flow { }` that (1) emits the current Room cache immediately, then (2) fetches from remote, saves to cache, and emits the refreshed cache. Do not change this to `channelFlow + launch` — it causes non-deterministic ordering in tests with `StandardTestDispatcher`.
+**`FlowUseCase` base class** (`usecase/base/FlowUseCase.kt`): every use case extends `FlowUseCase<INPUT, INTERMEDIATE, RESULT>`, implementing `doWork(input): Flow<INTERMEDIATE>` and `onSucceedDataHandling(intermediate): UseCaseOutputWithStatus.Success<RESULT>`. `invoke(input)` always emits `Progress` first, then maps each `doWork` emission through `onSucceedDataHandling`, and converts any exception (from `doWork` or the mapping) into a terminal `Failed(error, failedResult)`. ViewModels collect this and switch on `Progress` / `Success` / `Failed`.
 
-**`BooksListViewModel` state pipeline**: `_sortOrder.flatMapLatest { loadBooksUseCase(it) }` combined with `_viewMode`, `_searchQuery`, `_isSearchActive` flows via `combine`, producing `UiState<BooksListState>` via `stateIn(WhileSubscribed(5000))`. Sort order change re-triggers the use case; the cache emits immediately so there is no Loading flash between sort changes.
+**Offline-first flow** (`LoadBooksUseCase.doWork`): sequential `flow { }` that (1) emits the current Room cache immediately, then (2) fetches from remote, saves to cache, and emits the refreshed cache. Do not change this to `channelFlow + launch` — it causes non-deterministic ordering in tests with `StandardTestDispatcher`. A remote failure after the cache emission surfaces as a `Failed` output (via `FlowUseCase`'s catch), not a thrown exception — the ViewModel still has the stale cached data until the next collect.
+
+**`BooksListViewModel` state pipeline**: `_sortOrder.flatMapLatest { loadBooksUseCase.invoke(it) }` combined with `_viewMode`, `_searchQuery`, `_isSearchActive` flows via `combine`, producing `UiState<BooksListState>` via `stateIn(WhileSubscribed(5000))`. The `UseCaseOutputWithStatus` from `invoke()` is switched on inside the final `combine` block (`Progress` → `UiState.Loading`, `Success` → `UiState.Success`, `Failed` → `UiState.Error`). Sort order change re-triggers the use case.
+
+**StateFlow conflation across multi-stage `combine` chains**: when a `FlowUseCase` emits several `UseCaseOutputWithStatus` values back-to-back with no real suspension between them (as happens with synchronous fakes in tests), intermediate values feeding a `combine().stateIn()` chain can be conflated away before a `Turbine` collector attaches — the collector may observe only a subset of `Progress`/`Success`/`Failed`, including possibly just the final one. Tests that assert on an intermediate stage (e.g. cache-first success before a remote failure) must loop-skip past whichever transient states arrive rather than assuming an exact emission count (see `BooksListViewModelTest.state shows error when use case emits failure`).
 
 **`BookDetailViewModel`**: reads `bookId` directly from `SavedStateHandle["bookId"]` — do not use `toRoute<>()` (requires Navigation backstack context, unavailable in unit tests).
 
@@ -107,10 +113,10 @@ Every screen follows this contract:
 ### Testing approach
 
 Fakes over mocks — no Mockk usage in existing tests despite it being on the classpath:
-- `FakeBookDao` — `MutableStateFlow`-backed; has `seed(List<BookEntity>)` to pre-populate
+- `FakeBookDao` — `MutableStateFlow`-backed; has `seed(List<BookEntity>)` to pre-populate; `getBookById`/`upsertBooks`/`clearAll` call `yield()` first (see gotcha below)
 - `FakeBooksRemoteRepository` — extends `BooksRemoteRepository()`; exposes `var books` and `var shouldThrow`
-- `FakeLoadBooksUseCase` / `FakeGetBookDetailUseCase` — extend the real use case classes and override `operator fun invoke`
+- ViewModel tests construct the **real** `LoadBooksUseCase` / `GetBookDetailUseCase` wired to `FakeBooksRemoteRepository` + `FakeBookDao` (via `BooksCacheRepository`) rather than subclassing the use case — `FlowUseCase.invoke()` is a concrete, non-open function, so there is nothing to override; control test scenarios through the fakes' `books`/`shouldThrow`/`seed(...)` instead.
 
 All ViewModel tests set `Dispatchers.setMain(UnconfinedTestDispatcher())` in `@Before` and reset in `@After`. Use Turbine's `Flow.test { }` for asserting emissions. Access state via `viewModel.state` (not `uiState`).
 
-**StateFlow conflation gotcha**: if a fake `suspend fun` has no real suspension points, `Loading → Success` can happen in one tick and the intermediate `Loading` emission is dropped by StateFlow conflation. Add `yield()` inside the fake to give collectors a chance to observe transient states (see `FakeGetBookDetailUseCase`).
+**StateFlow conflation gotcha**: if a fake `suspend fun` has no real suspension points, several state transitions (e.g. `Loading → Success`, or `Loading → Success → Error`) can happen in one tick and intermediate emissions are dropped by StateFlow conflation before a Turbine collector attaches — sometimes down to only the *final* value. `FakeBookDao`'s methods call `yield()` to give collectors a chance to observe transient states, but this doesn't guarantee every intermediate stage of a multi-stage `FlowUseCase` (Progress → cache Success → remote Failed) is individually observable. Prefer asserting the eventual/terminal state with a loop that skips past whichever transient states arrive, rather than asserting an exact emission count, for any test that races through more than two states.

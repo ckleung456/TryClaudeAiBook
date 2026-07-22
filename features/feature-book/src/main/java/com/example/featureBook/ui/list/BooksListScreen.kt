@@ -155,7 +155,7 @@ fun BooksListScreen(
                 loadingContent = {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 },
-                errorContent = { uiText ->
+                errorContent = { uiText, _ ->
                     ErrorContent(
                         message = uiText.asString(),
                         modifier = Modifier.align(Alignment.Center)

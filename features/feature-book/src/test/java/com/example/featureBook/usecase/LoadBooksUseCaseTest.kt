@@ -3,11 +3,11 @@ package com.example.featureBook.usecase
 import app.cash.turbine.test
 import com.example.featureBook.fake.FakeBookDao
 import com.example.featureBook.fake.FakeBooksRemoteRepository
-import com.example.featureBook.model.domain.BookUiModel
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.model.network.Book
 import com.example.featureBook.module.local.BooksCacheRepository
+import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -33,10 +33,10 @@ class LoadBooksUseCaseTest {
     fun `emits empty list first when cache is empty`() = runTest {
         fakeRemote.books = listOf(makeBook("1", "Alpha"))
 
-        useCase(SortOrder.ASCENDING).test {
-            val first = awaitItem()
-            assertTrue(first.isSuccess)
-            assertEquals(emptyList<BookUiModel>(), first.getOrNull())
+        useCase.invoke(SortOrder.ASCENDING).test {
+            assertTrue(awaitItem() is UseCaseOutputWithStatus.Progress)
+            val cached = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals(emptyList<Any>(), cached.result)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -45,10 +45,10 @@ class LoadBooksUseCaseTest {
     fun `emits cached books immediately when cache has data`() = runTest {
         fakeDao.seed(listOf(makeEntity("1", "Alpha"), makeEntity("2", "Beta")))
 
-        useCase(SortOrder.ASCENDING).test {
-            val first = awaitItem()
-            assertTrue(first.isSuccess)
-            assertEquals(2, first.getOrNull()?.size)
+        useCase.invoke(SortOrder.ASCENDING).test {
+            awaitItem() // Progress
+            val cached = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals(2, cached.result.size)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -57,11 +57,11 @@ class LoadBooksUseCaseTest {
     fun `books are sorted ascending by first title character`() = runTest {
         fakeRemote.books = listOf(makeBook("1", "Zeta"), makeBook("2", "Alpha"))
 
-        useCase(SortOrder.ASCENDING).test {
+        useCase.invoke(SortOrder.ASCENDING).test {
+            awaitItem() // Progress
             awaitItem() // empty cache emission
-            val result = awaitItem() // after remote refresh
-            val books = result.getOrNull()!!
-            assertEquals("Alpha", books.first().title)
+            val refreshed = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals("Alpha", refreshed.result.first().title)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -70,24 +70,23 @@ class LoadBooksUseCaseTest {
     fun `books are sorted descending by first title character`() = runTest {
         fakeRemote.books = listOf(makeBook("1", "Alpha"), makeBook("2", "Zeta"))
 
-        useCase(SortOrder.DESCENDING).test {
+        useCase.invoke(SortOrder.DESCENDING).test {
+            awaitItem() // Progress
             awaitItem() // empty cache emission
-            val result = awaitItem() // after remote refresh
-            val books = result.getOrNull()!!
-            assertEquals("Zeta", books.first().title)
+            val refreshed = awaitItem() as UseCaseOutputWithStatus.Success
+            assertEquals("Zeta", refreshed.result.first().title)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `emits failure result when remote throws`() = runTest {
+    fun `emits failure when remote throws`() = runTest {
         fakeRemote.shouldThrow = true
 
-        useCase(SortOrder.ASCENDING).test {
-            val first = awaitItem() // empty list from cache
-            assertTrue(first.isSuccess)
-            val errorResult = awaitItem()
-            assertTrue(errorResult.isFailure)
+        useCase.invoke(SortOrder.ASCENDING).test {
+            awaitItem() // Progress
+            awaitItem() // empty list from cache
+            assertTrue(awaitItem() is UseCaseOutputWithStatus.Failed)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -96,7 +95,8 @@ class LoadBooksUseCaseTest {
     fun `remote books are saved to cache after fetch`() = runTest {
         fakeRemote.books = listOf(makeBook("1", "Alpha"))
 
-        useCase(SortOrder.ASCENDING).test {
+        useCase.invoke(SortOrder.ASCENDING).test {
+            awaitItem() // Progress
             awaitItem() // empty cache
             awaitItem() // after remote save
             cancelAndIgnoreRemainingEvents()
