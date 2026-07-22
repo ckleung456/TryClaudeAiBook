@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +93,7 @@ fun BooksListScreen(
     onAction: (BooksListAction) -> Unit
 ) {
     val data = (state as? UiState.Success)?.data
+    val localOnAction = remember { onAction }
 
     Scaffold(
         topBar = {
@@ -100,7 +102,7 @@ fun BooksListScreen(
                     if (data?.isSearchActive == true) {
                         TextField(
                             value = data.searchQuery,
-                            onValueChange = { onAction(BooksListAction.OnUpdateSearchQuery(it)) },
+                            onValueChange = { localOnAction(BooksListAction.OnUpdateSearchQuery(it)) },
                             placeholder = { Text("Search by title or author") },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
@@ -117,20 +119,20 @@ fun BooksListScreen(
                 },
                 actions = {
                     if (data?.isSearchActive == true) {
-                        IconButton(onClick = { onAction(BooksListAction.OnSetSearchActive(false)) }) {
+                        IconButton(onClick = { localOnAction(BooksListAction.OnSetSearchActive(false)) }) {
                             Icon(Icons.Default.Close, contentDescription = "Close search")
                         }
                     } else {
-                        IconButton(onClick = { onAction(BooksListAction.OnSetSearchActive(true)) }) {
+                        IconButton(onClick = { localOnAction(BooksListAction.OnSetSearchActive(true)) }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { onAction(BooksListAction.OnToggleSortOrder) }) {
+                        IconButton(onClick = { localOnAction(BooksListAction.OnToggleSortOrder) }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Sort,
                                 contentDescription = if (data?.sortOrder == SortOrder.ASCENDING) "Sort Z→A" else "Sort A→Z"
                             )
                         }
-                        IconButton(onClick = { onAction(BooksListAction.OnToggleViewMode) }) {
+                        IconButton(onClick = { localOnAction(BooksListAction.OnToggleViewMode) }) {
                             Icon(
                                 imageVector = if (data?.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList,
                                 contentDescription = if (data?.viewMode == ViewMode.LIST) "Switch to grid" else "Switch to list"
@@ -166,15 +168,15 @@ fun BooksListScreen(
                         BooksListContent(
                             books = booksListState.displayedBooks,
                             initialScrollIndex = booksListState.savedScrollIndex,
-                            onBookClick = { onAction(BooksListAction.OnBookClick(it)) },
-                            onScrollPositionChange = { onAction(BooksListAction.OnSaveScrollPosition(it)) }
+                            onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
+                            onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
                         )
                     } else {
                         BooksGridContent(
                             books = booksListState.displayedBooks,
                             initialScrollIndex = booksListState.savedScrollIndex,
-                            onBookClick = { onAction(BooksListAction.OnBookClick(it)) },
-                            onScrollPositionChange = { onAction(BooksListAction.OnSaveScrollPosition(it)) }
+                            onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
+                            onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
                         )
                     }
                 }

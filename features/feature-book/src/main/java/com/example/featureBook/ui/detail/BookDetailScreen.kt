@@ -33,6 +33,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -74,8 +75,9 @@ fun BookDetailScreen(
     onAction: (BookDetailAction) -> Unit
 ) {
     val title = (state as? UiState.Success)?.data?.book?.title ?: "Book Detail"
+    val rememberOnAction = remember { onAction }
 
-    BackHandler { onAction(BookDetailAction.OnBackClick) }
+    BackHandler { rememberOnAction(BookDetailAction.OnBackClick) }
 
     Scaffold(
         topBar = {
@@ -88,7 +90,7 @@ fun BookDetailScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { onAction(BookDetailAction.OnBackClick) }) {
+                    IconButton(onClick = { rememberOnAction(BookDetailAction.OnBackClick) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Navigate back"
