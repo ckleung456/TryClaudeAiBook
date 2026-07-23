@@ -1,10 +1,14 @@
 package com.example.featureBook.module.network
 
-import android.util.Log
+import com.example.core.domain.DataError
+import com.example.core.domain.Result
 import com.example.featureBook.model.domain.MockBookData
 import com.example.featureBook.model.network.Book
 import com.example.featureBook.model.network.BooksResponse
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,16 +21,24 @@ open class BooksRemoteRepository @Inject constructor() {
         coerceInputValues = true
     }
 
-    open suspend fun loadBooks(): List<Book> = try {
-        delay(1000)
-        json.decodeFromString<BooksResponse>(MockBookData.booksJson).books
-    } catch (ex: Exception) {
-        Log.w("BooksRemoteRepository", "Error parsing books", ex)
-        emptyList()
+    open suspend fun loadBooks(): Result<List<Book>, DataError.Network> = withContext(Dispatchers.IO) {
+        try {
+            delay(10000)
+            Result.Success(json.decodeFromString<BooksResponse>(MockBookData.booksJson).books)
+        } catch (e: SerializationException) {
+            Result.Error(DataError.Network.SERIALIZATION)
+        } catch (e: Exception) {
+            Result.Error(DataError.Network.UNKNOWN)
+        }
     }
 
-    open suspend fun getBookDetail(bookId: String): Book? {
+    open suspend fun getBookDetail(bookId: String): Result<Book, DataError.Network> = withContext(Dispatchers.IO) {
         delay(500)
-        return loadBooks().find { it.id == bookId }
+        when (val result = loadBooks()) {
+            is Result.Success -> result.data.find { it.id == bookId }
+                ?.let { Result.Success(it) }
+                ?: Result.Error(DataError.Network.NOT_FOUND)
+            is Result.Error -> result
+        }
     }
 }

@@ -3,10 +3,10 @@ package com.example.featureBook.ui.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.featureBook.ui.UiState
-import com.example.featureBook.ui.UiText
+import com.example.core.presentation.UiState
+import com.example.featureBook.ui.toUiText
 import com.example.featureBook.usecase.GetBookDetailUseCase
-import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
+import com.example.core.presentation.UseCaseOutputWithStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -38,10 +38,18 @@ class BookDetailViewModel @Inject constructor(
 
     fun onAction(action: BookDetailAction) {
         when (action) {
-            BookDetailAction.OnRetry -> loadBookDetail()
-            BookDetailAction.OnBackClick -> viewModelScope.launch {
-                _events.send(BookDetailEvent.NavigateBack)
-            }
+            BookDetailAction.OnRetry -> retry()
+            BookDetailAction.OnBackClick -> navigateBack()
+        }
+    }
+
+    private fun retry() {
+        loadBookDetail()
+    }
+
+    private fun navigateBack() {
+        viewModelScope.launch {
+            _events.send(BookDetailEvent.NavigateBack)
         }
     }
 
@@ -54,7 +62,12 @@ class BookDetailViewModel @Inject constructor(
                     is UseCaseOutputWithStatus.Success ->
                         _state.update { UiState.Success(BookDetailState(output.result)) }
                     is UseCaseOutputWithStatus.Failed ->
-                        _state.update { UiState.Error(UiText.DynamicString(output.error.message ?: "Unknown error")) }
+                        _state.update { current ->
+                            UiState.Error(
+                                message = output.error.toUiText(),
+                                errorData = (current as? UiState.Success)?.data
+                            )
+                        }
                 }
             }
         }

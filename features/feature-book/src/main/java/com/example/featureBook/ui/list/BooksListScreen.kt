@@ -45,7 +45,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -57,23 +56,25 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.example.featureBook.model.domain.BookUiModel
+import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
-import com.example.featureBook.ui.ObserveAsEvents
-import com.example.featureBook.ui.UIStatefulContent
-import com.example.featureBook.ui.UiState
-import com.example.featureBook.ui.asString
+import com.example.core.presentation.ObserveAsEvents
+import com.example.core.presentation.UiStatefulContent
+import com.example.core.presentation.UiState
+import com.example.core.presentation.asString
 
 @Composable
 fun BooksListRoot(
     onNavigateToDetail: (String) -> Unit,
     viewModel: BooksListViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
@@ -153,7 +154,7 @@ fun BooksListScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            UIStatefulContent(
+            UiStatefulContent(
                 state = state,
                 loadingContent = {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -194,7 +195,7 @@ fun BooksListScreen(
 
 @Composable
 private fun BooksListContent(
-    books: List<BookUiModel>,
+    books: List<BookUi>,
     initialScrollIndex: Int,
     onBookClick: (String) -> Unit,
     onScrollPositionChange: (Int) -> Unit
@@ -215,7 +216,7 @@ private fun BooksListContent(
 
 @Composable
 private fun BooksGridContent(
-    books: List<BookUiModel>,
+    books: List<BookUi>,
     initialScrollIndex: Int,
     onBookClick: (String) -> Unit,
     onScrollPositionChange: (Int) -> Unit
@@ -238,7 +239,7 @@ private fun BooksGridContent(
 }
 
 @Composable
-private fun BookListItem(book: BookUiModel, onClick: () -> Unit) {
+private fun BookListItem(book: BookUi, onClick: () -> Unit) {
     val fallbackPainter = rememberVectorPainter(Icons.AutoMirrored.Filled.MenuBook)
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -283,7 +284,7 @@ private fun BookListItem(book: BookUiModel, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BookGridItem(book: BookUiModel, onClick: () -> Unit) {
+private fun BookGridItem(book: BookUi, onClick: () -> Unit) {
     val fallbackPainter = rememberVectorPainter(Icons.AutoMirrored.Filled.MenuBook)
     Card(
         modifier = Modifier
@@ -352,4 +353,36 @@ private fun ErrorContent(message: String, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+private val previewBooks = listOf(
+    BookUi(
+        id = "1",
+        title = "The Pragmatic Programmer",
+        author = "David Thomas",
+        coverUrl = "",
+        publishedYear = 1999,
+        rating = 4.5,
+        description = "A guide to becoming a better programmer.",
+        genres = listOf("Software Engineering")
+    ),
+    BookUi(
+        id = "2",
+        title = "Clean Code",
+        author = "Robert C. Martin",
+        coverUrl = "",
+        publishedYear = 2008,
+        rating = 4.2,
+        description = "A handbook of agile software craftsmanship.",
+        genres = listOf("Software Engineering")
+    )
+)
+
+@Preview
+@Composable
+private fun BooksListScreenPreview() {
+    BooksListScreen(
+        state = UiState.Success(BooksListState(books = previewBooks)),
+        onAction = {}
+    )
 }

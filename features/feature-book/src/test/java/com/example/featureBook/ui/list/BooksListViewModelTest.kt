@@ -8,8 +8,8 @@ import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.module.local.BooksCacheRepository
-import com.example.featureBook.ui.UiState
-import com.example.featureBook.ui.UiText
+import com.example.core.presentation.UiState
+import com.example.core.presentation.UiText
 import com.example.featureBook.usecase.LoadBooksUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -83,7 +83,7 @@ class BooksListViewModelTest {
                 state = awaitItem()
             }
             assertTrue(state is UiState.Error)
-            assertEquals("Network error", ((state as UiState.Error).message as UiText.DynamicString).value)
+            assertTrue((state as UiState.Error).message is UiText.StringResource)
             cancelAndIgnoreRemainingEvents()
         }
     }

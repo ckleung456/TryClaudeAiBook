@@ -43,6 +43,9 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:domain"))
+    implementation(project(":core:presentation"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -76,6 +79,7 @@ dependencies {
     // Lifecycle ViewModel Compose
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)

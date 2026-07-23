@@ -10,9 +10,7 @@ plugins {
 
 android {
     namespace = "com.example.tryclaudeaibook"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.tryclaudeaibook"
@@ -37,11 +35,20 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+
+    // This is the fix:
+//    kotlinOptions {
+//        jvmTarget = "11"
+//    }
+
     buildFeatures {
         compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 

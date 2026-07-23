@@ -3,13 +3,14 @@ package com.example.featureBook.ui.list
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.featureBook.model.domain.BookUiModel
+import com.example.core.domain.DataError
+import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
-import com.example.featureBook.ui.UiState
-import com.example.featureBook.ui.UiText
+import com.example.core.presentation.UiState
+import com.example.featureBook.ui.toUiText
 import com.example.featureBook.usecase.LoadBooksUseCase
-import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
+import com.example.core.presentation.UseCaseOutputWithStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -30,7 +31,7 @@ import javax.inject.Inject
 private const val KEY_SCROLL_INDEX = "scroll_index"
 
 private data class ListInputs(
-    val output: UseCaseOutputWithStatus<List<BookUiModel>>,
+    val output: UseCaseOutputWithStatus<List<BookUi>, DataError>,
     val sortOrder: SortOrder,
     val viewMode: ViewMode,
     val searchQuery: String,
@@ -53,7 +54,7 @@ class BooksListViewModel @Inject constructor(
     val events: Flow<BooksListEvent> = _events.receiveAsFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val outputWithSortOrder: Flow<Pair<UseCaseOutputWithStatus<List<BookUiModel>>, SortOrder>> =
+    private val outputWithSortOrder: Flow<Pair<UseCaseOutputWithStatus<List<BookUi>, DataError>, SortOrder>> =
         combine(_sortOrder, _refreshSignal) { sortOrder, _ -> sortOrder }
             .flatMapLatest { sortOrder ->
                 loadBooksUseCase.invoke(sortOrder).map { output -> output to sortOrder }
@@ -99,7 +100,8 @@ class BooksListViewModel @Inject constructor(
                     )
                 )
                 is UseCaseOutputWithStatus.Failed -> UiState.Error(
-                    UiText.DynamicString(output.error.message ?: "Unknown error")
+                    message = output.error.toUiText(),
+                    errorData = (previous as? UiState.Success)?.data
                 )
             }
         }
@@ -111,21 +113,44 @@ class BooksListViewModel @Inject constructor(
 
     fun onAction(action: BooksListAction) {
         when (action) {
-            BooksListAction.OnToggleViewMode ->
-                _viewMode.update { if (it == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST }
-            BooksListAction.OnToggleSortOrder ->
-                _sortOrder.update { if (it == SortOrder.ASCENDING) SortOrder.DESCENDING else SortOrder.ASCENDING }
-            is BooksListAction.OnUpdateSearchQuery -> _searchQuery.value = action.query
-            is BooksListAction.OnSetSearchActive -> {
-                _isSearchActive.value = action.active
-                if (!action.active) _searchQuery.value = ""
-            }
-            is BooksListAction.OnBookClick -> viewModelScope.launch {
-                _events.send(BooksListEvent.NavigateToDetail(action.bookId))
-            }
-            is BooksListAction.OnSaveScrollPosition ->
-                savedStateHandle[KEY_SCROLL_INDEX] = action.index
-            BooksListAction.OnRefresh -> _refreshSignal.update { it + 1 }
+            BooksListAction.OnToggleViewMode -> toggleViewMode()
+            BooksListAction.OnToggleSortOrder -> toggleSortOrder()
+            is BooksListAction.OnUpdateSearchQuery -> updateSearchQuery(action.query)
+            is BooksListAction.OnSetSearchActive -> setSearchActive(action.active)
+            is BooksListAction.OnBookClick -> navigateToDetail(action.bookId)
+            is BooksListAction.OnSaveScrollPosition -> saveScrollPosition(action.index)
+            BooksListAction.OnRefresh -> refresh()
         }
+    }
+
+    private fun toggleViewMode() {
+        _viewMode.update { if (it == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST }
+    }
+
+    private fun toggleSortOrder() {
+        _sortOrder.update { if (it == SortOrder.ASCENDING) SortOrder.DESCENDING else SortOrder.ASCENDING }
+    }
+
+    private fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    private fun setSearchActive(active: Boolean) {
+        _isSearchActive.value = active
+        if (!active) _searchQuery.value = ""
+    }
+
+    private fun navigateToDetail(bookId: String) {
+        viewModelScope.launch {
+            _events.send(BooksListEvent.NavigateToDetail(bookId))
+        }
+    }
+
+    private fun saveScrollPosition(index: Int) {
+        savedStateHandle[KEY_SCROLL_INDEX] = index
+    }
+
+    private fun refresh() {
+        _refreshSignal.update { it + 1 }
     }
 }

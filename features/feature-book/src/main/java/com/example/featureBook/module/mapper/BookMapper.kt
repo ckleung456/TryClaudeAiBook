@@ -1,6 +1,6 @@
 package com.example.featureBook.module.mapper
 
-import com.example.featureBook.model.domain.BookUiModel
+import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.model.network.Book
@@ -17,7 +17,7 @@ fun Book.toEntity(): BookEntity = BookEntity(
     createdAt = createdAt
 )
 
-fun BookEntity.toUiModel(): BookUiModel = BookUiModel(
+fun BookEntity.toBookUi(): BookUi = BookUi(
     id = id,
     title = title,
     author = author,
@@ -28,7 +28,7 @@ fun BookEntity.toUiModel(): BookUiModel = BookUiModel(
     genres = if (genres.isBlank()) emptyList() else genres.split(",")
 )
 
-fun Book.toUiModel(): BookUiModel = BookUiModel(
+fun Book.toBookUi(): BookUi = BookUi(
     id = id,
     title = title,
     author = author,
@@ -39,7 +39,7 @@ fun Book.toUiModel(): BookUiModel = BookUiModel(
     genres = genres
 )
 
-fun List<BookUiModel>.sortedBySortOrder(order: SortOrder): List<BookUiModel> =
+fun List<BookUi>.sortedBySortOrder(order: SortOrder): List<BookUi> =
     if (order == SortOrder.ASCENDING) {
         sortedBy { it.title.firstOrNull()?.lowercaseChar() }
     } else {

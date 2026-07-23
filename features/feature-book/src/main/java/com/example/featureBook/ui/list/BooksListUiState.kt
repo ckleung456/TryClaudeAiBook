@@ -1,11 +1,11 @@
 package com.example.featureBook.ui.list
 
-import com.example.featureBook.model.domain.BookUiModel
+import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
 
 data class BooksListState(
-    val books: List<BookUiModel> = emptyList(),
+    val books: List<BookUi> = emptyList(),
     val viewMode: ViewMode = ViewMode.LIST,
     val sortOrder: SortOrder = SortOrder.ASCENDING,
     val searchQuery: String = "",
@@ -14,7 +14,7 @@ data class BooksListState(
     val isRefreshing: Boolean = false
 )
 
-val BooksListState.displayedBooks: List<BookUiModel>
+val BooksListState.displayedBooks: List<BookUi>
     get() = if (searchQuery.isBlank()) books
             else books.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||

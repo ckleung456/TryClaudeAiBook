@@ -6,7 +6,7 @@ import com.example.featureBook.fake.FakeBooksRemoteRepository
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.model.network.Book
 import com.example.featureBook.module.local.BooksCacheRepository
-import com.example.featureBook.usecase.base.UseCaseOutputWithStatus
+import com.example.core.presentation.UseCaseOutputWithStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

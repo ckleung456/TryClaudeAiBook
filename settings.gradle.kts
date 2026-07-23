@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 rootProject.name = "TryClaudeAiBook"
 include(":app")
 include(":features:feature-book")
+include(":core:domain")
+include(":core:presentation")

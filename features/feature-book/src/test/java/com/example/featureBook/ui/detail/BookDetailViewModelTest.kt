@@ -6,7 +6,8 @@ import com.example.featureBook.fake.FakeBookDao
 import com.example.featureBook.fake.FakeBooksRemoteRepository
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.module.local.BooksCacheRepository
-import com.example.featureBook.ui.UiState
+import com.example.core.presentation.UiState
+import com.example.core.presentation.UiText
 import com.example.featureBook.usecase.GetBookDetailUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -66,7 +67,7 @@ class BookDetailViewModelTest {
         viewModel.state.test {
             val state = awaitItem()
             assertTrue(state is UiState.Error)
-            assertTrue((state as UiState.Error).message.asString().isNotEmpty())
+            assertTrue((state as UiState.Error).message is UiText.StringResource)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -91,6 +92,3 @@ class BookDetailViewModelTest {
         publishedYear = 2020, rating = 4.0, description = "", genres = "", createdAt = 0L
     )
 }
-
-private fun com.example.featureBook.ui.UiText.asString(): String =
-    (this as com.example.featureBook.ui.UiText.DynamicString).value
