@@ -42,6 +42,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -164,20 +165,26 @@ fun BooksListScreen(
                     )
                 },
                 successContent = { booksListState ->
-                    if (booksListState.viewMode == ViewMode.LIST) {
-                        BooksListContent(
-                            books = booksListState.displayedBooks,
-                            initialScrollIndex = booksListState.savedScrollIndex,
-                            onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
-                            onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
-                        )
-                    } else {
-                        BooksGridContent(
-                            books = booksListState.displayedBooks,
-                            initialScrollIndex = booksListState.savedScrollIndex,
-                            onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
-                            onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
-                        )
+                    PullToRefreshBox(
+                        isRefreshing = booksListState.isRefreshing,
+                        onRefresh = { localOnAction(BooksListAction.OnRefresh) },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (booksListState.viewMode == ViewMode.LIST) {
+                            BooksListContent(
+                                books = booksListState.displayedBooks,
+                                initialScrollIndex = booksListState.savedScrollIndex,
+                                onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
+                                onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
+                            )
+                        } else {
+                            BooksGridContent(
+                                books = booksListState.displayedBooks,
+                                initialScrollIndex = booksListState.savedScrollIndex,
+                                onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
+                                onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
+                            )
+                        }
                     }
                 }
             )

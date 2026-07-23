@@ -3,6 +3,7 @@ package com.example.featureBook.ui.list
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.featureBook.model.domain.BookUiModel
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
 import com.example.featureBook.ui.UiState
@@ -20,12 +21,21 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val KEY_SCROLL_INDEX = "scroll_index"
+
+private data class ListInputs(
+    val output: UseCaseOutputWithStatus<List<BookUiModel>>,
+    val sortOrder: SortOrder,
+    val viewMode: ViewMode,
+    val searchQuery: String,
+    val isSearchActive: Boolean
+)
 
 @HiltViewModel
 class BooksListViewModel @Inject constructor(
@@ -37,35 +47,55 @@ class BooksListViewModel @Inject constructor(
     private val _viewMode = MutableStateFlow(ViewMode.LIST)
     private val _searchQuery = MutableStateFlow("")
     private val _isSearchActive = MutableStateFlow(false)
+    private val _refreshSignal = MutableStateFlow(0)
 
     private val _events = Channel<BooksListEvent>()
     val events: Flow<BooksListEvent> = _events.receiveAsFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val state: StateFlow<UiState<BooksListState>> = _sortOrder
-        .flatMapLatest { sortOrder ->
-            loadBooksUseCase.invoke(sortOrder).map { output -> output to sortOrder }
-        }
-        .combine(_viewMode) { (output, sortOrder), viewMode ->
-            Triple(output, sortOrder, viewMode)
-        }
-        .combine(_searchQuery) { (output, sortOrder, viewMode), query ->
-            Pair(output to sortOrder, viewMode to query)
-        }
-        .combine(_isSearchActive) { (outputAndSort, viewAndQuery), isSearchActive ->
-            val (output, sortOrder) = outputAndSort
-            val (viewMode, query) = viewAndQuery
+    private val outputWithSortOrder: Flow<Pair<UseCaseOutputWithStatus<List<BookUiModel>>, SortOrder>> =
+        combine(_sortOrder, _refreshSignal) { sortOrder, _ -> sortOrder }
+            .flatMapLatest { sortOrder ->
+                loadBooksUseCase.invoke(sortOrder).map { output -> output to sortOrder }
+            }
+
+    val state: StateFlow<UiState<BooksListState>> = combine(
+        outputWithSortOrder,
+        _viewMode,
+        _searchQuery,
+        _isSearchActive
+    ) { (output, sortOrder), viewMode, query, isSearchActive ->
+        ListInputs(output, sortOrder, viewMode, query, isSearchActive)
+    }
+        .scan(UiState.Loading as UiState<BooksListState>) { previous, inputs ->
             val savedScrollIndex = savedStateHandle.get<Int>(KEY_SCROLL_INDEX) ?: 0
-            when (output) {
-                is UseCaseOutputWithStatus.Progress -> UiState.Loading
+            when (val output = inputs.output) {
+                is UseCaseOutputWithStatus.Progress -> {
+                    val previousData = (previous as? UiState.Success)?.data
+                    if (previousData != null) {
+                        UiState.Success(
+                            previousData.copy(
+                                viewMode = inputs.viewMode,
+                                sortOrder = inputs.sortOrder,
+                                searchQuery = inputs.searchQuery,
+                                isSearchActive = inputs.isSearchActive,
+                                savedScrollIndex = savedScrollIndex,
+                                isRefreshing = true
+                            )
+                        )
+                    } else {
+                        UiState.Loading
+                    }
+                }
                 is UseCaseOutputWithStatus.Success -> UiState.Success(
                     BooksListState(
                         books = output.result,
-                        viewMode = viewMode,
-                        sortOrder = sortOrder,
-                        searchQuery = query,
-                        isSearchActive = isSearchActive,
-                        savedScrollIndex = savedScrollIndex
+                        viewMode = inputs.viewMode,
+                        sortOrder = inputs.sortOrder,
+                        searchQuery = inputs.searchQuery,
+                        isSearchActive = inputs.isSearchActive,
+                        savedScrollIndex = savedScrollIndex,
+                        isRefreshing = false
                     )
                 )
                 is UseCaseOutputWithStatus.Failed -> UiState.Error(
@@ -95,6 +125,7 @@ class BooksListViewModel @Inject constructor(
             }
             is BooksListAction.OnSaveScrollPosition ->
                 savedStateHandle[KEY_SCROLL_INDEX] = action.index
+            BooksListAction.OnRefresh -> _refreshSignal.update { it + 1 }
         }
     }
 }

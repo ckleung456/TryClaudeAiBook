@@ -10,7 +10,8 @@ data class BooksListState(
     val sortOrder: SortOrder = SortOrder.ASCENDING,
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
-    val savedScrollIndex: Int = 0
+    val savedScrollIndex: Int = 0,
+    val isRefreshing: Boolean = false
 )
 
 val BooksListState.displayedBooks: List<BookUiModel>

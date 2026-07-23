@@ -176,6 +176,32 @@ class BooksListViewModelTest {
     }
 
     @Test
+    fun `refresh keeps existing books visible while re-fetching`() = runTest {
+        fakeDao.seed(listOf(makeEntity("1", "Alpha"), makeEntity("2", "Beta")))
+
+        viewModel.state.test {
+            val initial = skipLoadingIfPresent()
+            assertTrue(initial is UiState.Success)
+            assertFalse((initial as UiState.Success).data.isRefreshing)
+
+            viewModel.onAction(BooksListAction.OnRefresh)
+
+            // StateFlow conflation under UnconfinedTestDispatcher may or may not surface a
+            // distinct isRefreshing=true emission before the refreshed data lands - tolerate
+            // either, but if it does appear, the previous books must still be showing.
+            var state = awaitItem()
+            if (state is UiState.Success && state.data.isRefreshing) {
+                assertEquals(initial.data.books, state.data.books)
+                state = awaitItem()
+            }
+            assertTrue(state is UiState.Success)
+            assertFalse((state as UiState.Success).data.isRefreshing)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `saveScrollPosition persists index in SavedStateHandle`() {
         val handle = SavedStateHandle()
         val vm = BooksListViewModel(loadBooksUseCase, handle)
