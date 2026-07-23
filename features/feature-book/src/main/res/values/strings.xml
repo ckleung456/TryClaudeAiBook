@@ -1,0 +1,6 @@
+<resources>
+    <string name="error_book_not_found">Book not found</string>
+    <string name="error_serialization">Couldn\'t read book data</string>
+    <string name="error_disk_full">Not enough storage space</string>
+    <string name="error_unknown">Something went wrong</string>
+</resources>
