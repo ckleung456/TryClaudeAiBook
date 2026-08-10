@@ -8,6 +8,8 @@ import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.module.local.BooksCacheRepository
 import com.example.core.presentation.UiState
 import com.example.core.presentation.UiText
+import com.example.featureBook.model.domain.detail.BookDetailAction
+import com.example.featureBook.model.domain.detail.BookDetailState
 import com.example.featureBook.usecase.GetBookDetailUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

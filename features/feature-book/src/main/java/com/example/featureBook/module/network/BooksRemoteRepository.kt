@@ -23,11 +23,11 @@ open class BooksRemoteRepository @Inject constructor() {
 
     open suspend fun loadBooks(): Result<List<Book>, DataError.Network> = withContext(Dispatchers.IO) {
         try {
-            delay(10000)
+            delay(1000)
             Result.Success(json.decodeFromString<BooksResponse>(MockBookData.booksJson).books)
-        } catch (e: SerializationException) {
+        } catch (_: SerializationException) {
             Result.Error(DataError.Network.SERIALIZATION)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Result.Error(DataError.Network.UNKNOWN)
         }
     }

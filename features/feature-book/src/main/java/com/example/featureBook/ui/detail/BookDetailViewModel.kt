@@ -4,9 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.presentation.UiState
-import com.example.featureBook.ui.toUiText
+import com.example.featureBook.module.mapper.toUiText
 import com.example.featureBook.usecase.GetBookDetailUseCase
 import com.example.core.presentation.UseCaseOutputWithStatus
+import com.example.featureBook.model.domain.detail.BookDetailAction
+import com.example.featureBook.model.domain.detail.BookDetailEvent
+import com.example.featureBook.model.domain.detail.BookDetailState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

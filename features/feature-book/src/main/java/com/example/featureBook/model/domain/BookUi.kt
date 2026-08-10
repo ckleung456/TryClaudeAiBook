@@ -1,5 +1,9 @@
 package com.example.featureBook.model.domain
 
+import androidx.compose.runtime.Immutable
+import kotlinx.collections.immutable.ImmutableList
+
+@Immutable
 data class BookUi(
     val id: String,
     val title: String,
@@ -8,5 +12,5 @@ data class BookUi(
     val publishedYear: Int,
     val rating: Double,
     val description: String,
-    val genres: List<String>
+    val genres: ImmutableList<String>
 )

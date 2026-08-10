@@ -19,13 +19,21 @@ abstract class FlowUseCase<in INPUT, INTERMEDIATE, out RESULT, out E : Error> {
         intermediate: @UnsafeVariance INTERMEDIATE
     ): RESULT
 
-    fun invoke(input: INPUT): Flow<UseCaseOutputWithStatus<RESULT, E>> = flow {
+    open suspend fun invoke(input: INPUT): Flow<UseCaseOutputWithStatus<RESULT, E>> = flow {
         emit(UseCaseOutputWithStatus.Progress)
-        doWork(input = input).collect { result ->
-            when (result) {
-                is Result.Success -> emit(UseCaseOutputWithStatus.Success(onSucceedDataHandling(result.data)))
-                is Result.Error -> emit(UseCaseOutputWithStatus.Failed(result.error))
+        //Log.w("FlowUseCase", "current thread: ${Thread.currentThread().name}")
+        doWork(input = input)
+            .collect { result ->
+                when (result) {
+                    is Result.Success -> emit(
+                        UseCaseOutputWithStatus.Success(
+                            onSucceedDataHandling(
+                                result.data
+                            )
+                        )
+                    )
+                    is Result.Error -> emit(UseCaseOutputWithStatus.Failed(result.error))
+                }
             }
-        }
-    }
+    }//.flowOn(Dispatchers.IO)
 }

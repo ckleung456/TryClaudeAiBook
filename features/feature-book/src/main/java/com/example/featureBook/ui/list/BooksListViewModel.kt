@@ -4,13 +4,18 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.domain.DataError
-import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
 import com.example.core.presentation.UiState
-import com.example.featureBook.ui.toUiText
+import com.example.featureBook.module.mapper.toUiText
 import com.example.featureBook.usecase.LoadBooksUseCase
 import com.example.core.presentation.UseCaseOutputWithStatus
+import com.example.featureBook.model.domain.list.BooksListInputs
+import com.example.featureBook.model.domain.LoadBooksResult
+import com.example.featureBook.model.domain.list.BooksListAction
+import com.example.featureBook.model.domain.list.BooksListEvent
+import com.example.featureBook.model.domain.list.BooksListState
+import kotlinx.collections.immutable.toPersistentList
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -28,21 +33,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val KEY_SCROLL_INDEX = "scroll_index"
-
-private data class ListInputs(
-    val output: UseCaseOutputWithStatus<List<BookUi>, DataError>,
-    val sortOrder: SortOrder,
-    val viewMode: ViewMode,
-    val searchQuery: String,
-    val isSearchActive: Boolean
-)
-
 @HiltViewModel
 class BooksListViewModel @Inject constructor(
     private val loadBooksUseCase: LoadBooksUseCase,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+    companion object {
+        private const val TAG = "BooksListViewModel"
+        private const val KEY_SCROLL_INDEX = "scroll_index"
+    }
 
     private val _sortOrder = MutableStateFlow(SortOrder.ASCENDING)
     private val _viewMode = MutableStateFlow(ViewMode.LIST)
@@ -54,7 +53,7 @@ class BooksListViewModel @Inject constructor(
     val events: Flow<BooksListEvent> = _events.receiveAsFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val outputWithSortOrder: Flow<Pair<UseCaseOutputWithStatus<List<BookUi>, DataError>, SortOrder>> =
+    private val outputWithSortOrder: Flow<Pair<UseCaseOutputWithStatus<LoadBooksResult, DataError>, SortOrder>> =
         combine(_sortOrder, _refreshSignal) { sortOrder, _ -> sortOrder }
             .flatMapLatest { sortOrder ->
                 loadBooksUseCase.invoke(sortOrder).map { output -> output to sortOrder }
@@ -66,7 +65,7 @@ class BooksListViewModel @Inject constructor(
         _searchQuery,
         _isSearchActive
     ) { (output, sortOrder), viewMode, query, isSearchActive ->
-        ListInputs(output, sortOrder, viewMode, query, isSearchActive)
+        BooksListInputs(output, sortOrder, viewMode, query, isSearchActive)
     }
         .scan(UiState.Loading as UiState<BooksListState>) { previous, inputs ->
             val savedScrollIndex = savedStateHandle.get<Int>(KEY_SCROLL_INDEX) ?: 0
@@ -90,13 +89,13 @@ class BooksListViewModel @Inject constructor(
                 }
                 is UseCaseOutputWithStatus.Success -> UiState.Success(
                     BooksListState(
-                        books = output.result,
+                        books = output.result.books.toPersistentList(),
                         viewMode = inputs.viewMode,
                         sortOrder = inputs.sortOrder,
                         searchQuery = inputs.searchQuery,
                         isSearchActive = inputs.isSearchActive,
                         savedScrollIndex = savedScrollIndex,
-                        isRefreshing = false
+                        isRefreshing = output.result.isFromCache
                     )
                 )
                 is UseCaseOutputWithStatus.Failed -> UiState.Error(

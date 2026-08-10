@@ -49,6 +49,10 @@ import com.example.core.presentation.ObserveAsEvents
 import com.example.core.presentation.UiStatefulContent
 import com.example.core.presentation.UiState
 import com.example.core.presentation.asString
+import com.example.featureBook.model.domain.detail.BookDetailAction
+import com.example.featureBook.model.domain.detail.BookDetailEvent
+import com.example.featureBook.model.domain.detail.BookDetailState
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun BookDetailRoot(
@@ -272,7 +276,7 @@ private fun BookDetailScreenPreview() {
                     publishedYear = 1999,
                     rating = 4.5,
                     description = "A guide to becoming a better programmer.",
-                    genres = listOf("Software Engineering")
+                    genres = persistentListOf("Software Engineering")
                 )
             )
         ),

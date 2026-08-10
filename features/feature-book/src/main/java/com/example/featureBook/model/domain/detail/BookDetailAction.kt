@@ -1,4 +1,4 @@
-package com.example.featureBook.ui.detail
+package com.example.featureBook.model.domain.detail
 
 sealed interface BookDetailAction {
     data object OnRetry : BookDetailAction

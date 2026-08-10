@@ -52,7 +52,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.hilt.android)
+    implementation(libs.androidx.compose.runtime)
     kapt(libs.hilt.compiler)
+    implementation(libs.kotlinx.imutable)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))

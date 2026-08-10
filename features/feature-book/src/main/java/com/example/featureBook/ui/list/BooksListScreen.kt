@@ -68,6 +68,11 @@ import com.example.core.presentation.ObserveAsEvents
 import com.example.core.presentation.UiStatefulContent
 import com.example.core.presentation.UiState
 import com.example.core.presentation.asString
+import com.example.featureBook.model.domain.list.BooksListAction
+import com.example.featureBook.model.domain.list.BooksListEvent
+import com.example.featureBook.model.domain.list.BooksListState
+import com.example.featureBook.model.domain.list.displayedBooks
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun BooksListRoot(
@@ -355,7 +360,7 @@ private fun ErrorContent(message: String, modifier: Modifier = Modifier) {
     }
 }
 
-private val previewBooks = listOf(
+private val previewBooks = persistentListOf(
     BookUi(
         id = "1",
         title = "The Pragmatic Programmer",
@@ -364,7 +369,7 @@ private val previewBooks = listOf(
         publishedYear = 1999,
         rating = 4.5,
         description = "A guide to becoming a better programmer.",
-        genres = listOf("Software Engineering")
+        genres = persistentListOf("Software Engineering")
     ),
     BookUi(
         id = "2",
@@ -374,7 +379,7 @@ private val previewBooks = listOf(
         publishedYear = 2008,
         rating = 4.2,
         description = "A handbook of agile software craftsmanship.",
-        genres = listOf("Software Engineering")
+        genres = persistentListOf("Software Engineering")
     )
 )
 

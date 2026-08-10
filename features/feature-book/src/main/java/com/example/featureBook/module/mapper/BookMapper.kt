@@ -4,6 +4,7 @@ import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.local.BookEntity
 import com.example.featureBook.model.network.Book
+import kotlinx.collections.immutable.toPersistentList
 
 fun Book.toEntity(): BookEntity = BookEntity(
     id = id,
@@ -25,7 +26,7 @@ fun BookEntity.toBookUi(): BookUi = BookUi(
     publishedYear = publishedYear,
     rating = rating,
     description = description ?: "",
-    genres = if (genres.isBlank()) emptyList() else genres.split(",")
+    genres = (if (genres.isBlank()) emptyList() else genres.split(",")).toPersistentList()
 )
 
 fun Book.toBookUi(): BookUi = BookUi(
@@ -36,7 +37,7 @@ fun Book.toBookUi(): BookUi = BookUi(
     publishedYear = publishedYear,
     rating = rating,
     description = description ?: "",
-    genres = genres
+    genres = genres.toPersistentList()
 )
 
 fun List<BookUi>.sortedBySortOrder(order: SortOrder): List<BookUi> =

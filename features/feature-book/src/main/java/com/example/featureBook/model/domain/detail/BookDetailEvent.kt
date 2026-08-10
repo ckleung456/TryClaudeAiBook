@@ -1,4 +1,4 @@
-package com.example.featureBook.ui.detail
+package com.example.featureBook.model.domain.detail
 
 sealed interface BookDetailEvent {
     data object NavigateBack : BookDetailEvent

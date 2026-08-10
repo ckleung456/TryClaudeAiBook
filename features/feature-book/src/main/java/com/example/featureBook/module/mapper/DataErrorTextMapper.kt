@@ -1,4 +1,4 @@
-package com.example.featureBook.ui
+package com.example.featureBook.module.mapper
 
 import com.example.featureBook.R
 import com.example.core.domain.DataError

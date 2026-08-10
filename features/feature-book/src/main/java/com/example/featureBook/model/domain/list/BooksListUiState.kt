@@ -1,11 +1,15 @@
-package com.example.featureBook.ui.list
+package com.example.featureBook.model.domain.list
 
+import androidx.compose.runtime.Immutable
 import com.example.featureBook.model.domain.BookUi
 import com.example.featureBook.model.domain.SortOrder
 import com.example.featureBook.model.domain.ViewMode
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
+@Immutable
 data class BooksListState(
-    val books: List<BookUi> = emptyList(),
+    val books: ImmutableList<BookUi> = persistentListOf(),
     val viewMode: ViewMode = ViewMode.LIST,
     val sortOrder: SortOrder = SortOrder.ASCENDING,
     val searchQuery: String = "",

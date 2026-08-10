@@ -1,4 +1,4 @@
-package com.example.featureBook.ui.list
+package com.example.featureBook.model.domain.list
 
 sealed interface BooksListAction {
     data object OnToggleViewMode : BooksListAction

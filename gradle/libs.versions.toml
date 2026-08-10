@@ -15,6 +15,7 @@ hilt = "2.57.2"
 kotlinSerialization = "2.2.0"
 kotlinxSerializationCore = "1.9.0"
 json = "1.6.3"
+immutable = "0.3.8"
 
 #retrofit
 retrofit = "3.0.0"
@@ -36,6 +37,7 @@ kotlinxCoroutines = "1.9.0"
 # Testing
 mockk = "1.13.12"
 turbine = "1.2.0"
+runtime = "1.11.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -62,6 +64,7 @@ retrofit-converter = { group = "com.squareup.retrofit2", name = "converter-gson"
 okhttp3-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
 kotlinx-serialization-json = { module  = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "json" }
+kotlinx-imutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "immutable" }
 
 # Room
 room-runtime  = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
@@ -90,6 +93,7 @@ kotlinx-coroutines-test    = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # Testing
 mockk   = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
