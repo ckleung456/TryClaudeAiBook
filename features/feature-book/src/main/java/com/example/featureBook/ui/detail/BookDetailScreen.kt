@@ -79,7 +79,7 @@ fun BookDetailScreen(
     state: UiState<BookDetailState>,
     onAction: (BookDetailAction) -> Unit
 ) {
-    val title = (state as? UiState.Success)?.data?.book?.title ?: "Book Detail"
+    val title = remember { (state as? UiState.Success)?.data?.book?.title ?: "Book Detail" }
     val rememberOnAction = remember { onAction }
 
     BackHandler { rememberOnAction(BookDetailAction.OnBackClick) }

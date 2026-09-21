@@ -99,8 +99,7 @@ fun BooksListScreen(
     state: UiState<BooksListState>,
     onAction: (BooksListAction) -> Unit
 ) {
-    val data = (state as? UiState.Success)?.data
-    val localOnAction = remember { onAction }
+    val data = remember { (state as? UiState.Success)?.data }
 
     Scaffold(
         topBar = {
@@ -109,7 +108,7 @@ fun BooksListScreen(
                     if (data?.isSearchActive == true) {
                         TextField(
                             value = data.searchQuery,
-                            onValueChange = { localOnAction(BooksListAction.OnUpdateSearchQuery(it)) },
+                            onValueChange = { onAction(BooksListAction.OnUpdateSearchQuery(it)) },
                             placeholder = { Text("Search by title or author") },
                             singleLine = true,
                             colors = TextFieldDefaults.colors(
@@ -126,20 +125,20 @@ fun BooksListScreen(
                 },
                 actions = {
                     if (data?.isSearchActive == true) {
-                        IconButton(onClick = { localOnAction(BooksListAction.OnSetSearchActive(false)) }) {
+                        IconButton(onClick = { onAction(BooksListAction.OnSetSearchActive(false)) }) {
                             Icon(Icons.Default.Close, contentDescription = "Close search")
                         }
                     } else {
-                        IconButton(onClick = { localOnAction(BooksListAction.OnSetSearchActive(true)) }) {
+                        IconButton(onClick = { onAction(BooksListAction.OnSetSearchActive(true)) }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
                         }
-                        IconButton(onClick = { localOnAction(BooksListAction.OnToggleSortOrder) }) {
+                        IconButton(onClick = { onAction(BooksListAction.OnToggleSortOrder) }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Sort,
                                 contentDescription = if (data?.sortOrder == SortOrder.ASCENDING) "Sort Z→A" else "Sort A→Z"
                             )
                         }
-                        IconButton(onClick = { localOnAction(BooksListAction.OnToggleViewMode) }) {
+                        IconButton(onClick = { onAction(BooksListAction.OnToggleViewMode) }) {
                             Icon(
                                 imageVector = if (data?.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList,
                                 contentDescription = if (data?.viewMode == ViewMode.LIST) "Switch to grid" else "Switch to list"
@@ -173,22 +172,22 @@ fun BooksListScreen(
                 successContent = { booksListState ->
                     PullToRefreshBox(
                         isRefreshing = booksListState.isRefreshing,
-                        onRefresh = { localOnAction(BooksListAction.OnRefresh) },
+                        onRefresh = { onAction(BooksListAction.OnRefresh) },
                         modifier = Modifier.fillMaxSize()
                     ) {
                         if (booksListState.viewMode == ViewMode.LIST) {
                             BooksListContent(
                                 books = booksListState.displayedBooks,
                                 initialScrollIndex = booksListState.savedScrollIndex,
-                                onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
-                                onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
+                                onBookClick = { onAction(BooksListAction.OnBookClick(it)) },
+                                onScrollPositionChange = { onAction(BooksListAction.OnSaveScrollPosition(it)) }
                             )
                         } else {
                             BooksGridContent(
                                 books = booksListState.displayedBooks,
                                 initialScrollIndex = booksListState.savedScrollIndex,
-                                onBookClick = { localOnAction(BooksListAction.OnBookClick(it)) },
-                                onScrollPositionChange = { localOnAction(BooksListAction.OnSaveScrollPosition(it)) }
+                                onBookClick = { onAction(BooksListAction.OnBookClick(it)) },
+                                onScrollPositionChange = { onAction(BooksListAction.OnSaveScrollPosition(it)) }
                             )
                         }
                     }
